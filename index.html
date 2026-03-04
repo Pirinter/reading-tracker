@@ -6,12 +6,22 @@
     <title>PagePulse - Cloud Reading Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Confetti Library -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .animate-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .hidden-admin { display: none !important; }
+        
+        /* Goal Reached Animation */
+        .goal-pulse { animation: pulse-gold 2s infinite; }
+        @keyframes pulse-gold {
+            0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(251, 191, 36, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+        }
     </style>
 </head>
 <body class="bg-[#F8FAFC] text-slate-900 pb-20">
@@ -64,14 +74,15 @@
                     <p id="stat-total-pages" class="text-2xl font-bold">0</p>
                 </div>
             </div>
-            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-                <div class="bg-amber-100 text-amber-600 p-3 rounded-xl"><i data-lucide="award"></i></div>
-                <div>
-                    <p class="text-sm text-gray-500 font-medium">Class Goal (10k)</p>
-                    <div class="flex items-center gap-2">
-                        <div class="flex-1 h-2 w-24 bg-gray-100 rounded-full overflow-hidden">
-                            <div id="goal-progress-bar" class="h-full bg-amber-400" style="width: 0%"></div>
+            <div id="goal-card" class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 transition-all duration-500">
+                <div id="goal-icon-bg" class="bg-amber-100 text-amber-600 p-3 rounded-xl"><i data-lucide="award"></i></div>
+                <div class="flex-1">
+                    <p id="goal-label" class="text-sm text-gray-500 font-medium">Class Goal (3k)</p>
+                    <div class="flex items-center gap-2 mt-1">
+                        <div class="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                            <div id="goal-progress-bar" class="h-full bg-amber-400 transition-all duration-1000" style="width: 0%"></div>
                         </div>
+                        <span id="goal-percent" class="text-xs font-bold text-amber-600">0%</span>
                     </div>
                 </div>
             </div>
@@ -118,7 +129,7 @@
 
         <!-- Teacher Admin View -->
         <div id="view-admin" class="hidden animate-in grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-1">
+            <div class="lg:col-span-1 space-y-6">
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                     <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><i data-lucide="user-plus"></i> New Student</h2>
                     <form onsubmit="handleAddStudent(event)" class="space-y-4">
@@ -129,6 +140,14 @@
                         </div>
                         <button type="submit" id="add-student-btn" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Add Student</button>
                     </form>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl border border-red-100 shadow-sm bg-red-50/30">
+                    <h2 class="text-lg font-bold mb-2 text-red-700 flex items-center gap-2"><i data-lucide="rotate-ccw"></i> Reset Center</h2>
+                    <p class="text-xs text-red-500 mb-4 leading-relaxed">This will reset all page counts to zero. Student names will be preserved.</p>
+                    <button onclick="resetAllPages()" id="reset-pages-btn" class="w-full bg-white border border-red-200 text-red-600 py-3 rounded-xl font-bold hover:bg-red-600 hover:text-white transition-all shadow-sm">
+                        Reset All Pages
+                    </button>
                 </div>
             </div>
             <div class="lg:col-span-2">
@@ -183,6 +202,8 @@
         let students = [];
         let isTeacherMode = false;
         let currentGenderSelection = 'Boy';
+        let goalReachedNotificationShown = false;
+        const CLASS_GOAL = 3000;
         const TEACHER_PASSWORD = "1234";
 
         // Start Auth & Data Listeners
@@ -196,12 +217,10 @@
                 });
             } catch (err) {
                 console.error("Auth failed:", err);
-                alert("Could not connect to database. Check your Firebase config.");
             }
         }
 
         function setupRealtimeSync() {
-            // Collection path: Adjust 'class_reading' to whatever you like
             const studentsRef = collection(db, 'students');
             
             onSnapshot(studentsRef, (snapshot) => {
@@ -221,7 +240,7 @@
             }
         }
 
-        // CRUD Operations (Cloud Version)
+        // CRUD Operations
         window.handleAddStudent = async function(e) {
             e.preventDefault();
             const btn = document.getElementById('add-student-btn');
@@ -283,7 +302,38 @@
             }
         };
 
-        // UI Logic (Standard)
+        window.resetAllPages = async function() {
+            if (!isTeacherMode) return;
+            const confirmMsg = "Are you sure you want to reset ALL pages to zero? \n\n(Student names will remain, but all progress will be lost.)";
+            if (confirm(confirmMsg)) {
+                const btn = document.getElementById('reset-pages-btn');
+                btn.innerText = "Resetting...";
+                btn.disabled = true;
+
+                try {
+                    // Loop through and update each student
+                    const resetPromises = students.map(s => {
+                        const studentRef = doc(db, 'students', s.id);
+                        return updateDoc(studentRef, {
+                            total: 0,
+                            logs: []
+                        });
+                    });
+
+                    await Promise.all(resetPromises);
+                    showNotification("All pages reset to 0.");
+                    goalReachedNotificationShown = false; // Allow confetti to trigger again next time goal reached
+                } catch (err) {
+                    console.error("Reset failed:", err);
+                    alert("Error resetting pages. Check your connection.");
+                } finally {
+                    btn.innerText = "Reset All Pages";
+                    btn.disabled = false;
+                }
+            }
+        };
+
+        // UI Logic
         window.switchView = function(viewName) {
             if (viewName === 'admin' && !isTeacherMode) return;
             ['leaderboard', 'log', 'admin'].forEach(v => {
@@ -344,11 +394,61 @@
             document.getElementById('gender-girl').className = g === 'Girl' ? 'flex-1 py-2 rounded-xl text-sm font-bold border bg-slate-800 text-white' : 'flex-1 py-2 rounded-xl text-sm font-bold border bg-white text-gray-500';
         };
 
+        function triggerConfetti() {
+            const duration = 5 * 1000;
+            const animationEnd = Date.now() + duration;
+            const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+            function randomInRange(min, max) {
+              return Math.random() * (max - min) + min;
+            }
+
+            const interval = setInterval(function() {
+              const timeLeft = animationEnd - Date.now();
+
+              if (timeLeft <= 0) {
+                return clearInterval(interval);
+              }
+
+              const particleCount = 50 * (timeLeft / duration);
+              confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+              confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+            }, 250);
+        }
+
         function renderAll() {
             const totalPages = students.reduce((sum, s) => sum + (s.total || 0), 0);
+            const progressPercent = Math.min((totalPages / CLASS_GOAL) * 100, 100);
+            
             document.getElementById('stat-total-students').innerText = students.length;
             document.getElementById('stat-total-pages').innerText = totalPages.toLocaleString();
-            document.getElementById('goal-progress-bar').style.width = Math.min((totalPages / 10000) * 100, 100) + '%';
+            
+            // Update Goal Bar
+            const bar = document.getElementById('goal-progress-bar');
+            const percentLabel = document.getElementById('goal-percent');
+            const goalCard = document.getElementById('goal-card');
+            const goalIcon = document.getElementById('goal-icon-bg');
+            
+            bar.style.width = progressPercent + '%';
+            percentLabel.innerText = Math.floor(progressPercent) + '%';
+
+            // Check if goal reached
+            if (totalPages >= CLASS_GOAL) {
+                goalCard.classList.add('goal-pulse', 'border-amber-200', 'bg-amber-50');
+                goalIcon.classList.remove('bg-amber-100');
+                goalIcon.classList.add('bg-amber-500', 'text-white');
+                
+                if (!goalReachedNotificationShown) {
+                    triggerConfetti();
+                    showNotification("GOAL REACHED! 🏆🥳");
+                    goalReachedNotificationShown = true;
+                }
+            } else {
+                // Remove visual feedback if below goal (e.g. after reset)
+                goalCard.classList.remove('goal-pulse', 'border-amber-200', 'bg-amber-50');
+                goalIcon.classList.add('bg-amber-100');
+                goalIcon.classList.remove('bg-amber-500', 'text-white');
+            }
 
             renderLeaderboard('list-boys', students.filter(s => s.gender === 'Boy'));
             renderLeaderboard('list-girls', students.filter(s => s.gender === 'Girl'));

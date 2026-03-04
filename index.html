@@ -12,7 +12,6 @@
         .animate-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .hidden-admin { display: none !important; }
-        [v-cloak] { display: none; }
     </style>
 </head>
 <body class="bg-[#F8FAFC] text-slate-900 pb-20">
@@ -38,9 +37,10 @@
     </nav>
 
     <main class="max-w-5xl mx-auto px-4 py-8">
+        <!-- Loading State -->
         <div id="loading-overlay" class="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center transition-opacity duration-500">
-            <div id="loading-spinner" class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-            <p id="loading-text" class="text-gray-500 font-medium text-center">Syncing with Cloud...</p>
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p class="text-gray-500 font-medium">Connecting to Cloud...</p>
         </div>
 
         <div id="notification" class="hidden fixed top-20 right-4 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl z-50 flex items-center gap-3 border border-white/10">
@@ -155,111 +155,99 @@
         </div>
     </div>
 
-    <!-- Firebase SDKs -->
+    <!-- FIREBASE MODULES -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, updateDoc, deleteDoc, collection, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, updateDoc, deleteDoc, collection, onSnapshot, query, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ==========================================
+        // 1. PASTE YOUR CONFIG FROM FIREBASE BELOW:
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
+            messagingSenderId: "YOUR_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
         // Global state
         let students = [];
         let isTeacherMode = false;
         let currentGenderSelection = 'Boy';
-        let currentUser = null;
-        let db = null;
-        let auth = null;
-        const TEACHER_PASSWORD = "12345679";
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'reading-tracker-v1';
+        const TEACHER_PASSWORD = "1234";
 
-        // Initialize App
+        // Start Auth & Data Listeners
         async function init() {
             try {
-                // Paste your actual config here
-                const firebaseConfig = {
-    apiKey: "AIzaSyD_hRsVFoGuN-kwewcGFmkw8M3ybiCWsrk",
-    authDomain: "reading-tracker-72282.firebaseapp.com",
-    projectId: "reading-tracker-72282",
-    storageBucket: "reading-tracker-72282.firebasestorage.app",
-    messagingSenderId: "11384559054",
-    appId: "1:11384559054:web:d2ccaddba36a1fed5a879f"
-};
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                // Authentication Protocol
                 await signInAnonymously(auth);
-
                 onAuthStateChanged(auth, (user) => {
-                    currentUser = user;
                     if (user) {
-                        setupDataListener();
+                        setupRealtimeSync();
                     }
                 });
-
             } catch (err) {
-                console.error("Initialization failed", err);
-                document.getElementById('loading-text').innerText = "Connection failed. Check Firebase console.";
+                console.error("Auth failed:", err);
+                alert("Could not connect to database. Check your Firebase config.");
             }
         }
 
-        // Real-time Data Listener (FOLLOWING PATH RULES)
-        function setupDataListener() {
-            // Path must follow: /artifacts/{appId}/public/data/{collectionName}
-            const dataPath = collection(db, 'students');
+        function setupRealtimeSync() {
+            // Collection path: Adjust 'class_reading' to whatever you like
+            const studentsRef = collection(db, 'students');
             
-            // onSnapshot with error callback (Required)
-            onSnapshot(dataPath, (snapshot) => {
+            onSnapshot(studentsRef, (snapshot) => {
                 students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderAll();
-                
-                // Hide loading overlay
-                const loader = document.getElementById('loading-overlay');
-                loader.style.opacity = '0';
-                setTimeout(() => loader.classList.add('hidden'), 500);
+                hideLoader();
             }, (error) => {
-                console.error("Snapshot error:", error);
-                if (error.code === 'permission-denied') {
-                    document.getElementById('loading-text').innerText = "Permission Denied. Retrying...";
-                }
+                console.error("Sync error:", error);
             });
         }
 
-        // CRUD Operations
+        function hideLoader() {
+            const loader = document.getElementById('loading-overlay');
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.classList.add('hidden'), 500);
+            }
+        }
+
+        // CRUD Operations (Cloud Version)
         window.handleAddStudent = async function(e) {
             e.preventDefault();
-            if (!currentUser || !db) return;
-            
             const btn = document.getElementById('add-student-btn');
+            const nameInput = document.getElementById('new-student-name');
+            const name = nameInput.value.trim();
+            if (!name) return;
+
             btn.disabled = true;
-            btn.innerText = "Adding...";
-
-            const name = document.getElementById('new-student-name').value;
-            const studentId = Date.now().toString();
-
             try {
-                // RULE 1: Specific path for writing
-                const studentRef = doc(db, 'students', studentId);
-                await setDoc(studentRef, {
-                    name,
+                const id = Date.now().toString();
+                await setDoc(doc(db, 'students', id), {
+                    name: name,
                     gender: currentGenderSelection,
                     total: 0,
                     logs: []
                 });
-                document.getElementById('new-student-name').value = '';
+                nameInput.value = '';
                 showNotification(`Added ${name}!`);
             } catch (err) {
-                console.error("Add failed:", err);
+                console.error(err);
             } finally {
                 btn.disabled = false;
-                btn.innerText = "Add Student";
             }
         };
 
         window.handleLogPages = async function(e) {
             e.preventDefault();
-            if (!currentUser || !db) return;
-
             const id = document.getElementById('log-student-select').value;
             const pagesInput = document.getElementById('log-pages-input');
             const pages = parseInt(pagesInput.value);
@@ -268,39 +256,33 @@
             const btn = document.getElementById('log-submit-btn');
             btn.disabled = true;
 
-            const student = students.find(s => s.id === id);
-            const newTotal = (student.total || 0) + pages;
-            const newLog = { date: new Date().toISOString(), pages };
-
             try {
-                const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', id);
+                const student = students.find(s => s.id === id);
+                const studentRef = doc(db, 'students', id);
+                
                 await updateDoc(studentRef, {
-                    total: newTotal,
-                    logs: [newLog, ...(student.logs || [])]
+                    total: (student.total || 0) + pages,
+                    logs: arrayUnion({ date: new Date().toISOString(), pages: pages })
                 });
+
                 pagesInput.value = '';
                 showNotification(`Logged ${pages} pages!`);
             } catch (err) {
-                console.error("Log failed:", err);
+                console.error(err);
             } finally {
                 btn.disabled = false;
             }
         };
 
         window.deleteStudent = async function(id) {
-            if (!isTeacherMode || !currentUser || !db) return;
-            if (confirm("Delete this student permanently?")) {
-                try {
-                    const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', id);
-                    await deleteDoc(studentRef);
-                    showNotification("Student removed.");
-                } catch (err) {
-                    console.error("Delete failed:", err);
-                }
+            if (!isTeacherMode) return;
+            if (confirm("Delete this student permanently from the cloud?")) {
+                await deleteDoc(doc(db, 'students', id));
+                showNotification("Student removed.");
             }
         };
 
-        // UI View Logic
+        // UI Logic (Standard)
         window.switchView = function(viewName) {
             if (viewName === 'admin' && !isTeacherMode) return;
             ['leaderboard', 'log', 'admin'].forEach(v => {

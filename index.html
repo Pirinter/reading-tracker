@@ -239,7 +239,7 @@
 
             try {
                 // RULE 1: Specific path for writing
-                const studentRef = doc(db, 'artifacts', appId, 'public', 'data', 'students', studentId);
+                const studentRef = doc(db, 'students', studentId);
                 await setDoc(studentRef, {
                     name,
                     gender: currentGenderSelection,

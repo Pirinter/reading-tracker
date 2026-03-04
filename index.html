@@ -206,7 +206,7 @@
         // Real-time Data Listener (FOLLOWING PATH RULES)
         function setupDataListener() {
             // Path must follow: /artifacts/{appId}/public/data/{collectionName}
-            const dataPath = collection(db, 'artifacts', appId, 'public', 'data', 'students');
+            const dataPath = collection(db, 'students');
             
             // onSnapshot with error callback (Required)
             onSnapshot(dataPath, (snapshot) => {

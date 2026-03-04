@@ -176,14 +176,13 @@
             try {
                 // Paste your actual config here
                 const firebaseConfig = {
-                    apiKey: "AIzaSyD_hRsVFoGuN-kwewcGFmkw8M3ybiCWsrk",
-                    authDomain: "reading-tracker-72282.firebaseapp.com",
-                    projectId: "reading-tracker-72282",
-                    storageBucket: "reading-tracker-72282.firebasestorage.app",
-                    messagingSenderId: "11384559054",
-                    appId: "1:11384559054:web:d2ccaddba36a1fed5a879f"
-                };
-
+    apiKey: "AIzaSyD_hRsVFoGuN-kwewcGFmkw8M3ybiCWsrk",
+    authDomain: "reading-tracker-72282.firebaseapp.com",
+    projectId: "reading-tracker-72282",
+    storageBucket: "reading-tracker-72282.firebasestorage.app",
+    messagingSenderId: "11384559054",
+    appId: "1:11384559054:web:d2ccaddba36a1fed5a879f"
+};
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);

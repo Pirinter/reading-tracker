@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PagePulse - Reading Tracker</title>
+    <!-- Tailwind CSS for Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .animate-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .hidden-admin { display: none !important; }
+    </style>
+</head>
+<body class="bg-[#F8FAFC] text-slate-900 pb-20">
+
+    <!-- Top Navigation Bar -->
+    <nav class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-200">
+        <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="bg-blue-600 p-2 rounded-lg text-white">
+                    <i data-lucide="book-open"></i>
+                </div>
+                <h1 class="text-xl font-extrabold tracking-tight text-slate-800">PagePulse</h1>
+            </div>
+            <div class="flex bg-gray-100 p-1 rounded-xl items-center">
+                <button onclick="switchView('leaderboard')" id="nav-leaderboard" class="px-4 py-1.5 rounded-lg text-sm font-medium transition-all bg-white shadow-sm text-blue-600">Leaderboard</button>
+                <button onclick="switchView('log')" id="nav-log" class="px-4 py-1.5 rounded-lg text-sm font-medium transition-all text-gray-500 hover:text-gray-700">Add Reading</button>
+                <button onclick="switchView('admin')" id="nav-admin" class="hidden-admin px-4 py-1.5 rounded-lg text-sm font-medium transition-all text-gray-500 hover:text-gray-700">Students</button>
+                
+                <div class="w-[1px] h-4 bg-gray-300 mx-2"></div>
+                
+                <button onclick="toggleTeacherMode()" id="teacher-lock-btn" class="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 transition-all" title="Teacher Access">
+                    <i data-lucide="lock" id="lock-icon" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-5xl mx-auto px-4 py-8">
+        <!-- Notification Toast -->
+        <div id="notification" class="hidden fixed top-20 right-4 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl z-50 flex items-center gap-3 border border-white/10">
+            <div class="bg-green-500 rounded-full p-1"><i data-lucide="trending-up" class="w-4 h-4"></i></div>
+            <span id="notification-text"></span>
+        </div>
+
+        <!-- Header Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                <div class="bg-blue-100 text-blue-600 p-3 rounded-xl"><i data-lucide="users"></i></div>
+                <div>
+                    <p class="text-sm text-gray-500 font-medium">Total Students</p>
+                    <p id="stat-total-students" class="text-2xl font-bold">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                <div class="bg-purple-100 text-purple-600 p-3 rounded-xl"><i data-lucide="book-open"></i></div>
+                <div>
+                    <p class="text-sm text-gray-500 font-medium">Class Pages Read</p>
+                    <p id="stat-total-pages" class="text-2xl font-bold">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                <div class="bg-amber-100 text-amber-600 p-3 rounded-xl"><i data-lucide="award"></i></div>
+                <div>
+                    <p class="text-sm text-gray-500 font-medium">Class Goal (10k)</p>
+                    <div class="flex items-center gap-2">
+                        <div class="flex-1 h-2 w-24 bg-gray-100 rounded-full overflow-hidden">
+                            <div id="goal-progress-bar" class="h-full bg-amber-400" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEWS -->
+        
+        <!-- Leaderboard View -->
+        <div id="view-leaderboard" class="animate-in flex flex-col lg:flex-row gap-6">
+            <div class="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white flex items-center justify-between">
+                    <h2 class="text-xl font-bold flex items-center gap-2"><i data-lucide="trophy"></i> Boys' Rankings</h2>
+                </div>
+                <div id="list-boys" class="p-2 min-h-[100px]"></div>
+            </div>
+            <div class="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-4 bg-gradient-to-r from-pink-500 to-rose-600 text-white flex items-center justify-between">
+                    <h2 class="text-xl font-bold flex items-center gap-2"><i data-lucide="trophy"></i> Girls' Rankings</h2>
+                </div>
+                <div id="list-girls" class="p-2 min-h-[100px]"></div>
+            </div>
+        </div>
+
+        <!-- Log View -->
+        <div id="view-log" class="hidden animate-in max-w-md mx-auto">
+            <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl">
+                <div class="text-center mb-6">
+                    <div class="inline-flex bg-blue-50 p-3 rounded-2xl text-blue-600 mb-3"><i data-lucide="plus-circle" class="w-8 h-8"></i></div>
+                    <h2 class="text-2xl font-bold text-slate-800">Add Pages Read</h2>
+                    <p class="text-gray-400 text-sm mt-1">Great job reading today!</p>
+                </div>
+                <form onsubmit="handleLogPages(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Select Your Name</label>
+                        <select id="log-student-select" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" required></select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">How many pages?</label>
+                        <input id="log-pages-input" type="number" placeholder="e.g. 25" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" required>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                        Save My Progress <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Admin View -->
+        <div id="view-admin" class="hidden animate-in grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1">
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><i data-lucide="user-plus" class="text-blue-600"></i> New Student</h2>
+                    <form onsubmit="handleAddStudent(event)" class="space-y-4">
+                        <input id="new-student-name" type="text" placeholder="Student Name" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" required>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="setGender('Boy')" id="gender-boy" class="flex-1 py-2 rounded-xl text-sm font-bold border bg-slate-800 text-white border-slate-800">Boy</button>
+                            <button type="button" onclick="setGender('Girl')" id="gender-girl" class="flex-1 py-2 rounded-xl text-sm font-bold border bg-white text-gray-500 border-gray-200">Girl</button>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow-md">Add to Class</button>
+                    </form>
+                </div>
+            </div>
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div class="p-4 border-b bg-gray-50/50 flex justify-between items-center">
+                        <h2 class="font-bold flex items-center gap-2"><i data-lucide="users" class="text-blue-600"></i> Manage Class</h2>
+                        <span id="admin-count-badge" class="text-xs text-gray-500">0 Total</span>
+                    </div>
+                    <div id="admin-student-list" class="divide-y divide-gray-100 max-h-[500px] overflow-y-auto"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-100 py-3 text-center text-xs text-gray-400 font-medium">
+        Reading Challenge Dashboard &bull; Local Version &bull; <span id="teacher-status">Student View</span>
+    </footer>
+
+    <!-- Password Modal -->
+    <div id="password-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in">
+            <h3 class="text-xl font-bold text-center mb-4">Teacher Access</h3>
+            <p class="text-gray-500 text-center text-sm mb-6">Please enter the teacher password to manage students.</p>
+            <input type="password" id="admin-password" placeholder="Enter Password" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl mb-4 outline-none focus:ring-2 focus:ring-blue-500 text-center text-lg tracking-widest">
+            <div class="flex gap-3">
+                <button onclick="closePasswordModal()" class="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-100 rounded-xl">Cancel</button>
+                <button onclick="verifyPassword()" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700">Unlock</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State Management ---
+        let students = JSON.parse(localStorage.getItem('reading-challenge-students')) || [];
+        let currentGenderSelection = 'Boy';
+        let isTeacherMode = false;
+        const TEACHER_PASSWORD = "1234"; // CHANGE THIS PASSWORD HERE
+
+        // --- Core Functions ---
+        function save() {
+            localStorage.setItem('reading-challenge-students', JSON.stringify(students));
+            renderAll();
+        }
+
+        function showNotification(text) {
+            const el = document.getElementById('notification');
+            document.getElementById('notification-text').innerText = text;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 3000);
+        }
+
+        // --- Teacher Mode Logic ---
+        function toggleTeacherMode() {
+            if (isTeacherMode) {
+                isTeacherMode = false;
+                switchView('leaderboard');
+                updateTeacherUI();
+            } else {
+                document.getElementById('password-modal').classList.remove('hidden');
+                document.getElementById('admin-password').focus();
+            }
+        }
+
+        function closePasswordModal() {
+            document.getElementById('password-modal').classList.add('hidden');
+            document.getElementById('admin-password').value = '';
+        }
+
+        function verifyPassword() {
+            const pwd = document.getElementById('admin-password').value;
+            if (pwd === TEACHER_PASSWORD) {
+                isTeacherMode = true;
+                updateTeacherUI();
+                closePasswordModal();
+                switchView('admin');
+                showNotification("Teacher access granted.");
+            } else {
+                alert("Incorrect password!");
+                document.getElementById('admin-password').value = '';
+            }
+        }
+
+        function updateTeacherUI() {
+            const adminNav = document.getElementById('nav-admin');
+            const statusText = document.getElementById('teacher-status');
+            const lockIcon = document.getElementById('lock-icon');
+            
+            if (isTeacherMode) {
+                adminNav.classList.remove('hidden-admin');
+                statusText.innerText = "Teacher Mode (Unlocked)";
+                statusText.classList.add('text-blue-600');
+                lockIcon.setAttribute('data-lucide', 'unlock');
+            } else {
+                adminNav.classList.add('hidden-admin');
+                statusText.innerText = "Student View (Locked)";
+                statusText.classList.remove('text-blue-600');
+                lockIcon.setAttribute('data-lucide', 'lock');
+            }
+            lucide.createIcons();
+        }
+
+        // --- View Switching ---
+        function switchView(viewName) {
+            // Prevent students from guessing URL/Console to see admin view
+            if (viewName === 'admin' && !isTeacherMode) {
+                switchView('leaderboard');
+                return;
+            }
+
+            ['leaderboard', 'log', 'admin'].forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                if (el) el.classList.add('hidden');
+                const nav = document.getElementById(`nav-${v}`);
+                if (nav) {
+                    nav.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
+                    nav.classList.add('text-gray-500');
+                }
+            });
+            
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            document.getElementById(`nav-${viewName}`).classList.add('bg-white', 'shadow-sm', 'text-blue-600');
+            document.getElementById(`nav-${viewName}`).classList.remove('text-gray-500');
+            renderAll();
+        }
+
+        // --- Actions ---
+        function setGender(g) {
+            currentGenderSelection = g;
+            document.getElementById('gender-boy').className = g === 'Boy' ? 'flex-1 py-2 rounded-xl text-sm font-bold border bg-slate-800 text-white border-slate-800' : 'flex-1 py-2 rounded-xl text-sm font-bold border bg-white text-gray-500 border-gray-200';
+            document.getElementById('gender-girl').className = g === 'Girl' ? 'flex-1 py-2 rounded-xl text-sm font-bold border bg-slate-800 text-white border-slate-800' : 'flex-1 py-2 rounded-xl text-sm font-bold border bg-white text-gray-500 border-gray-200';
+        }
+
+        function handleAddStudent(e) {
+            e.preventDefault();
+            const nameInput = document.getElementById('new-student-name');
+            const newStudent = {
+                id: Date.now().toString(),
+                name: nameInput.value,
+                gender: currentGenderSelection,
+                total: 0,
+                logs: []
+            };
+            students.push(newStudent);
+            nameInput.value = '';
+            showNotification(`Added ${newStudent.name}!`);
+            save();
+        }
+
+        function handleLogPages(e) {
+            e.preventDefault();
+            const id = document.getElementById('log-student-select').value;
+            const pagesInput = document.getElementById('log-pages-input');
+            const pages = parseInt(pagesInput.value);
+            
+            if (!id || isNaN(pages) || pages <= 0) return;
+
+            const student = students.find(s => s.id === id);
+            if (student) {
+                student.total += pages;
+                student.logs.unshift({ date: new Date().toISOString(), pages });
+                showNotification(`Logged ${pages} pages for ${student.name}!`);
+                pagesInput.value = '';
+                save();
+            }
+        }
+
+        function deleteStudent(id) {
+            if (!isTeacherMode) return;
+            if(confirm("Are you sure you want to remove this student? All their progress will be lost.")) {
+                students = students.filter(s => s.id !== id);
+                save();
+            }
+        }
+
+        // --- Rendering ---
+        function renderAll() {
+            const totalPages = students.reduce((sum, s) => sum + s.total, 0);
+            
+            // Stats
+            document.getElementById('stat-total-students').innerText = students.length;
+            document.getElementById('stat-total-pages').innerText = totalPages.toLocaleString();
+            document.getElementById('goal-progress-bar').style.width = Math.min((totalPages / 10000) * 100, 100) + '%';
+
+            // Leaderboards
+            renderLeaderboard('list-boys', students.filter(s => s.gender === 'Boy'));
+            renderLeaderboard('list-girls', students.filter(s => s.gender === 'Girl'));
+
+            // Select Dropdown
+            const select = document.getElementById('log-student-select');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">-- Click to find your name --</option>' + 
+                students.sort((a,b) => a.name.localeCompare(b.name))
+                .map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            select.value = currentVal;
+
+            // Admin List
+            document.getElementById('admin-count-badge').innerText = `${students.length} Total`;
+            document.getElementById('admin-student-list').innerHTML = students.length === 0 ? 
+                '<div class="p-10 text-center text-gray-400 italic">No students registered yet. Click "New Student" on the left.</div>' :
+                students.map(s => `
+                    <div class="p-4 flex items-center justify-between hover:bg-gray-50">
+                        <div>
+                            <p class="font-bold text-slate-800">${s.name}</p>
+                            <p class="text-xs text-gray-500 uppercase">${s.gender} • ${s.logs.length} entries</p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="text-right">
+                                <p class="text-sm font-black text-blue-600">${s.total}</p>
+                                <p class="text-[10px] text-gray-400 uppercase">Pages</p>
+                            </div>
+                            <button onclick="deleteStudent('${s.id}')" class="text-gray-300 hover:text-red-500 transition-colors p-2">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+            lucide.createIcons();
+        }
+
+        function renderLeaderboard(id, list) {
+            const sorted = list.sort((a,b) => b.total - a.total);
+            const container = document.getElementById(id);
+            if (sorted.length === 0) {
+                container.innerHTML = '<div class="py-10 text-center text-gray-400 italic">No entries yet</div>';
+                return;
+            }
+            container.innerHTML = '<div class="space-y-1">' + sorted.map((s, idx) => `
+                <div class="flex items-center justify-between p-3 rounded-xl transition-all ${idx === 0 ? 'bg-yellow-50 border border-yellow-100' : 'hover:bg-gray-50'}">
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${idx === 0 ? 'bg-yellow-400 text-white' : idx === 1 ? 'bg-gray-300 text-gray-700' : idx === 2 ? 'bg-orange-300 text-white' : 'bg-gray-100 text-gray-500'}">
+                            ${idx + 1}
+                        </span>
+                        <span class="font-semibold text-gray-800">${s.name}</span>
+                    </div>
+                    <div class="flex items-center gap-1 text-blue-600 font-bold">
+                        <span>${s.total.toLocaleString()}</span>
+                        <span class="text-[10px] uppercase text-gray-400">pgs</span>
+                    </div>
+                </div>
+            `).join('') + '</div>';
+        }
+
+        // Initialize
+        window.onload = () => {
+            renderAll();
+            lucide.createIcons();
+        };
+    </script>
+</body>
+</html>

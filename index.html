@@ -174,24 +174,22 @@
         // Initialize App
         async function init() {
             try {
-                // RULE 1 & 3: Ensure Config exists and Auth is priority
-                if (typeof __firebase_config === 'undefined') {
-                    document.getElementById('loading-spinner').classList.add('hidden');
-                    document.getElementById('loading-text').innerHTML = "Cloud configuration missing.<br><span class='text-xs'>This file must be hosted to connect to the cloud.</span>";
-                    return;
-                }
+                // Paste your actual config here
+                const firebaseConfig = {
+                    apiKey: "AIzaSyD_hRsVFoGuN-kwewcGFmkw8M3ybiCWsrk",
+                    authDomain: "reading-tracker-72282.firebaseapp.com",
+                    projectId: "reading-tracker-72282",
+                    storageBucket: "reading-tracker-72282.firebasestorage.app",
+                    messagingSenderId: "11384559054",
+                    appId: "1:11384559054:web:d2ccaddba36a1fed5a879f"
+                };
 
-                const firebaseConfig = JSON.parse(__firebase_config);
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
 
                 // Authentication Protocol
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                await signInAnonymously(auth);
 
                 onAuthStateChanged(auth, (user) => {
                     currentUser = user;
@@ -202,7 +200,7 @@
 
             } catch (err) {
                 console.error("Initialization failed", err);
-                document.getElementById('loading-text').innerText = "Connection failed. Please refresh.";
+                document.getElementById('loading-text').innerText = "Connection failed. Check Firebase console.";
             }
         }
 

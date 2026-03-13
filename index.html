@@ -203,7 +203,7 @@
         let isTeacherMode = false;
         let currentGenderSelection = 'Boy';
         let goalReachedNotificationShown = false;
-        const CLASS_GOAL = 3000;
+        const CLASS_GOAL = 10000;
         const TEACHER_PASSWORD = "0800";
 
         // Start Auth & Data Listeners
@@ -492,7 +492,7 @@
             const el = document.getElementById('notification');
             document.getElementById('notification-text').innerText = text;
             el.classList.remove('hidden');
-            setTimeout(() => el.classList.add('hidden'), 3000);
+            setTimeout(() => el.classList.add('hidden'), 10000);
         }
 
         init();
